@@ -252,35 +252,26 @@ function Animation:Play(fadeTime: number?, weight: number?, speed: number?)
 	end)()
 end
 
-function Animation:ApplyPose(humanoid: Humanoid, keyframe)
-	if not keyframe then
-		warn("No valid keyframe found at this time position.")
-		return
-	end
+function Animation:ApplyPose(humanoid: Humanoid, keyframe: Keyframe)
+	assert(
+		keyframe ~= nil and typeof(keyframe) == "Instance" and keyframe:IsA("Keyframe"),
+		"Keyframe must be a Keyframe Instance!"
+	)
 
 	for _, pose in ipairs(keyframe:GetChildren()) do
 		if pose:IsA("Pose") then
 			local part = humanoid.Parent:FindFirstChild(pose.Name)
+
+			-- Skip the transformation on HumanoidRootPart itself but apply to its descendants
 			if part and part:IsA("BasePart") then
 				if part.Name == "HumanoidRootPart" then
-					continue;
-				end
-				
-				-- Find the correct Motor6D that connects to this part
-				local motor = nil
-				for _, descendant in ipairs(humanoid.Parent:GetDescendants()) do
-					if descendant:IsA("Motor6D") and descendant.Part1 == part then
-						motor = descendant
-						break
+					-- Recursively apply transformations to descendants
+					for _, descendantPose in ipairs(pose:GetChildren()) do
+						self:ApplyPoseToPart(humanoid, descendantPose)
 					end
-				end
-
-				-- Apply the pose to the Motor6D
-				if motor then
-					motor.Transform = pose.CFrame
-					_debug("Applied pose to motor:", motor.Name, "for part:", part.Name)
 				else
-					warn("Motor6D not found for part: " .. part.Name)
+					-- Apply the transformation to other parts
+					self:ApplyPoseToPart(humanoid, pose)
 				end
 			else
 				warn("Part not found or not a BasePart: " .. tostring(pose.Name))
@@ -289,8 +280,40 @@ function Animation:ApplyPose(humanoid: Humanoid, keyframe)
 	end
 end
 
+-- Helper function to apply pose to individual parts
+function Animation:ApplyPoseToPart(humanoid: Humanoid, pose: Pose)
+	assert(pose ~= nil and typeof(pose) == "Instance" and pose:IsA("Pose"), "Pose must be a Pose Instance!")
+
+	local part = humanoid.Parent:FindFirstChild(pose.Name)
+	if not part or not part:IsA("BasePart") then
+		warn("Part not found or not a BasePart: " .. tostring(pose.Name))
+		return
+	end
+
+	-- Find the Motor6D or Bone associated with the part
+	local motorOrBone = nil
+	for _, descendant in ipairs(humanoid.Parent:GetDescendants()) do
+		if descendant:IsA("Motor6D") and descendant.Part1 == part then
+			motorOrBone = descendant
+			break
+		elseif descendant:IsA("Bone") and descendant.Parent == part then
+			motorOrBone = descendant
+			break
+		end
+	end
+
+	-- Apply the pose to the Motor6D or Bone
+	if motorOrBone then
+		motorOrBone.Transform = pose.CFrame
+		_debug("Applied pose to:", motorOrBone.Name, "for part:", part.Name)
+	else
+		warn("Motor6D or Bone not found for part: " .. part.Name)
+	end
+end
+
 function Animation:GetNextKeyframe(currentKeyframe)
 	local nextKeyframe = nil
+	
 	for _, keyframe in ipairs(self.Sequence:GetChildren()) do
 		if keyframe:IsA("Keyframe") and keyframe.Time > currentKeyframe.Time then
 			if not nextKeyframe or keyframe.Time < nextKeyframe.Time then
@@ -298,6 +321,7 @@ function Animation:GetNextKeyframe(currentKeyframe)
 			end
 		end
 	end
+
 	return nextKeyframe
 end
 
@@ -308,29 +332,37 @@ function Animation:ApplyInterpolatedPose(humanoid: Humanoid, currentKeyframe, ne
 	end
 
 	for _, currentPose in ipairs(currentKeyframe:GetChildren()) do
-		if currentPose:IsA("Pose") then
-			local nextPose = nextKeyframe:FindFirstChild(currentPose.Name)
-			if nextPose and nextPose:IsA("Pose") then
-				local part = humanoid.Parent:FindFirstChild(currentPose.Name)
-				if part and part:IsA("BasePart") then
-					local motor = nil
-					for _, descendant in ipairs(humanoid.Parent:GetDescendants()) do
-						if descendant:IsA("Motor6D") and descendant.Part1 == part then
-							motor = descendant
-							break
-						end
-					end
+		if not currentPose:IsA("Pose") then
+			continue
+		end
 
-					if motor then
-						local interpolatedCFrame = currentPose.CFrame:Lerp(nextPose.CFrame, alpha)
-						motor.Transform = interpolatedCFrame
-						_debug("Interpolated pose applied to motor:", motor.Name, "for part:", part.Name)
-					else
-						warn("Motor6D not found for part: " .. part.Name)
+		local nextPose = nextKeyframe:FindFirstChild(currentPose.Name)
+
+		if nextPose and nextPose:IsA("Pose") then
+			local part = humanoid.Parent:FindFirstChild(currentPose.Name)
+
+			if part and part:IsA("BasePart") then
+				local motorOrBone = nil
+
+				for _, descendant in ipairs(humanoid.Parent:GetDescendants()) do
+					if descendant:IsA("Motor6D") and descendant.Part1 == part then
+						motorOrBone = descendant
+						break
+					elseif descendant:IsA("Bone") and descendant.Parent == part then
+						motorOrBone = descendant
+						break
 					end
-				else
-					warn("Part not found or not a BasePart: " .. tostring(currentPose.Name))
 				end
+
+				if motorOrBone then
+					local interpolatedCFrame = currentPose.CFrame:Lerp(nextPose.CFrame, alpha)
+					motorOrBone.Transform = interpolatedCFrame
+					_debug("Interpolated pose applied to:", motorOrBone.Name, "for part:", part.Name)
+				else
+					warn("Motor6D or Bone not found for part: " .. part.Name)
+				end
+			else
+				warn("Part not found or not a BasePart: " .. tostring(currentPose.Name))
 			end
 		end
 	end
