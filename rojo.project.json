@@ -1,0 +1,16 @@
+{
+    "name": "KeyframePlayer",
+    "tree": {
+        "$className": "DataModel",
+        "ReplicatedStorage": {
+            "$className": "ReplicatedStorage",
+            "Packages": {
+                "$className": "Folder",
+                
+                "KeyframePlayer": {
+                    "$path": "src/KeyframePlayer"
+                }
+            }
+        }
+    }
+}
