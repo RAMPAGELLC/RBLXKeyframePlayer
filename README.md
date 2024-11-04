@@ -111,17 +111,17 @@ animation:AdjustWeight(0.8, 0.3)
 local time = animation:GetTimeOfKeyframe("JumpKeyframe")
 ```
 
-### Event Signals
+### Event Signals (RBXScriptSignal's replica)
 The following signals are available for tracking animation events:
-- **MarkerReachedSignal**: Fires when a marker within the keyframe is reached.
-- **DidLoopSignal**: Fires when the animation loops.
-- **EndedSignal**: Fires when the animation ends naturally.
-- **StoppedSignal**: Fires when the animation is stopped manually.
-- **PausedSignal**: Fires when the animation is paused.
+- **MarkerReached**: Fires when a marker within the keyframe is reached.
+- **DidLoop**: Fires when the animation loops.
+- **Ended**: Fires when the animation ends naturally.
+- **Stopped**: Fires when the animation is stopped manually.
+- **Paused**: Fires when the animation is paused.
 
 **Example**:
 ```lua
-animation.EndedSignal:Connect(function()
+animation.Ended:Connect(function()
     print("Animation has ended!")
 end)
 ```
